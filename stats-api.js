@@ -1,60 +1,64 @@
-export default {
-  async fetch(request) {
-    const url = new URL(request.url);
-    const path = url.pathname;
+import express from "express";
+import fetch from "node-fetch";
+import cors from "cors";
 
-    const UNIVERSE_ID = "9266409859";
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-    // ====== ROUTE : /stats ======
-    if (path === "/stats") {
+const UNIVERSE_ID = "9266409859";
 
-      // 1. Stats générales du jeu
-      const gameInfo = await fetch(
-        `https://games.roblox.com/v1/games?universeIds=${UNIVERSE_ID}`
-      ).then(r => r.json());
+// ===== ROUTE : /stats =====
+app.get("/stats", async (req, res) => {
+    try {
+        // 1. Infos générales du jeu
+        const gameInfo = await fetch(
+            `https://games.roblox.com/v1/games?universeIds=${UNIVERSE_ID}`
+        ).then(r => r.json());
 
-      const game = gameInfo.data[0];
+        const game = gameInfo.data[0];
 
-      // 2. Liste des serveurs
-      const servers = await fetch(
-        `https://games.roblox.com/v1/games/${UNIVERSE_ID}/servers/Public?limit=100`
-      ).then(r => r.json());
+        // 2. Liste des serveurs
+        const servers = await fetch(
+            `https://games.roblox.com/v1/games/${UNIVERSE_ID}/servers/Public?limit=100`
+        ).then(r => r.json());
 
-      // 3. Calcul du total joueurs
-      let totalPlayers = 0;
-      servers.data.forEach(s => totalPlayers += s.playing);
+        // 3. Total joueurs
+        let totalPlayers = 0;
+        servers.data.forEach(s => totalPlayers += s.playing);
 
-      // 4. Récupération des teams (via MessagingService)
-      // Le jeu doit envoyer les teams via MessagingService → Worker stocke en mémoire KV
-      let teams = {};
-      try {
-        teams = JSON.parse(await NANTES_TEAMS.get("teams") || "{}");
-      } catch {
-        teams = {};
-      }
-
-      // ====== RÉPONSE ======
-      return new Response(JSON.stringify({
-        name: game.name,
-        description: game.description,
-        visits: game.visits,
-        favorites: game.favoritedCount,
-        likes: game.likes,
-        dislikes: game.dislikes,
-        playing: game.playing,
-        maxPlayers: game.maxPlayers,
-
-        totalPlayers,
-        servers: servers.data,
-        teams
-      }), {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Content-Type": "application/json"
+        // 4. Teams (si ton jeu les envoie)
+        let teams = {};
+        try {
+            const teamsReq = await fetch("https://nantesrp-teams.kv/api");
+            teams = await teamsReq.json();
+        } catch {
+            teams = {};
         }
-      });
-    }
 
-    return new Response("NantesRP Stats API");
-  }
-};
+        res.json({
+            name: game.name,
+            description: game.description,
+            visits: game.visits,
+            favorites: game.favoritedCount,
+            likes: game.likes,
+            dislikes: game.dislikes,
+            playing: game.playing,
+            maxPlayers: game.maxPlayers,
+
+            totalPlayers,
+            servers: servers.data,
+            teams
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Erreur API Roblox" });
+    }
+});
+
+// ===== LANCEMENT SERVEUR =====
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log("API NantesRP Stats en ligne sur le port " + PORT);
+});
