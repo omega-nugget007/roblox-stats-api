@@ -24,31 +24,40 @@ app.get("/stats", async (req, res) => {
             `https://games.roblox.com/v1/games?universeIds=${UNIVERSE_ID}`
         ).then(r => r.json());
 
-        const game = gameInfo.data[0];
+        console.log("gameInfo:", gameInfo);
 
-        // playing = joueurs en jeu (Roblox)
-        const playing = game.playing;
+        // Vérification anti-crash
+        if (!gameInfo || !gameInfo.data || !gameInfo.data[0]) {
+            return res.status(500).json({
+                error: "Impossible de récupérer les données Roblox (data vide)",
+                raw: gameInfo
+            });
+        }
+
+        const game = gameInfo.data[0];
 
         res.json({
             name: game.name,
             description: game.description,
-            playing,          // nb joueurs en jeu
+            playing: game.playing,
             maxPlayers: game.maxPlayers,
             visits: game.visits,
             favorites: game.favoritedCount,
             likes: game.likes,
             dislikes: game.dislikes,
-            teams: teamsData  // nb joueurs par team (venant de Roblox)
+            teams: teamsData
         });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Erreur API Roblox" });
+        console.error("Erreur /stats :", err);
+        res.status(500).json({ error: "Erreur interne API" });
     }
 });
+
 
 // ====== LANCEMENT SERVEUR ======
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log("API NantesRP Stats en ligne sur le port " + PORT);
 });
+
