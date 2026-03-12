@@ -8,47 +8,37 @@ app.use(express.json());
 
 const UNIVERSE_ID = "9266409859";
 
-// ===== ROUTE : /stats =====
+// Stockage en mémoire (simple mais suffisant pour commencer)
+let teamsData = {};
+
+// ====== REÇOIT LES TEAMS DE ROBLOX ======
+app.post("/teams", (req, res) => {
+    teamsData = req.body || {};
+    return res.json({ ok: true });
+});
+
+// ====== STATS GLOBALES ======
 app.get("/stats", async (req, res) => {
     try {
-        // 1. Infos générales du jeu
         const gameInfo = await fetch(
             `https://games.roblox.com/v1/games?universeIds=${UNIVERSE_ID}`
         ).then(r => r.json());
 
         const game = gameInfo.data[0];
 
-        // 2. Liste des serveurs
-        const servers = await fetch(
-            `https://games.roblox.com/v1/games/${UNIVERSE_ID}/servers/Public?limit=100`
-        ).then(r => r.json());
-
-        // 3. Total joueurs
-        let totalPlayers = 0;
-        servers.data.forEach(s => totalPlayers += s.playing);
-
-        // 4. Teams (si ton jeu les envoie)
-        let teams = {};
-        try {
-            const teamsReq = await fetch("https://nantesrp-teams.kv/api");
-            teams = await teamsReq.json();
-        } catch {
-            teams = {};
-        }
+        // playing = joueurs en jeu (Roblox)
+        const playing = game.playing;
 
         res.json({
             name: game.name,
             description: game.description,
+            playing,          // nb joueurs en jeu
+            maxPlayers: game.maxPlayers,
             visits: game.visits,
             favorites: game.favoritedCount,
             likes: game.likes,
             dislikes: game.dislikes,
-            playing: game.playing,
-            maxPlayers: game.maxPlayers,
-
-            totalPlayers,
-            servers: servers.data,
-            teams
+            teams: teamsData  // nb joueurs par team (venant de Roblox)
         });
 
     } catch (err) {
@@ -57,7 +47,7 @@ app.get("/stats", async (req, res) => {
     }
 });
 
-// ===== LANCEMENT SERVEUR =====
+// ====== LANCEMENT SERVEUR ======
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log("API NantesRP Stats en ligne sur le port " + PORT);
