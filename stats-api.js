@@ -1,63 +1,61 @@
+// stats-api.js
 import express from "express";
-import fetch from "node-fetch";
 import cors from "cors";
 
 const app = express();
-app.use(cors());
+const PORT = process.env.PORT || 10000;
+
+// Pour accepter du JSON
 app.use(express.json());
+app.use(cors());
 
-const UNIVERSE_ID = "9266409859";
+// Stockage en mémoire des stats envoyées par le jeu
+let liveStats = {
+    playing: 0,
+    teams: {},
+    updatedAt: null
+};
 
-// Stockage en mémoire (simple mais suffisant pour commencer)
-let teamsData = {};
-
-// ====== REÇOIT LES TEAMS DE ROBLOX ======
-app.post("/teams", (req, res) => {
-    teamsData = req.body || {};
-    return res.json({ ok: true });
-});
-
-// ====== STATS GLOBALES ======
-app.get("/stats", async (req, res) => {
+// Endpoint appelé par TON JEU Roblox (HttpService:PostAsync)
+app.post("/ingame-stats", (req, res) => {
     try {
-        const gameInfo = await fetch(
-            `https://games.roblox.com/v1/games?universeIds=${UNIVERSE_ID}`
-        ).then(r => r.json());
+        const body = req.body;
 
-        console.log("gameInfo:", gameInfo);
-
-        // Vérification anti-crash
-        if (!gameInfo || !gameInfo.data || !gameInfo.data[0]) {
-            return res.status(500).json({
-                error: "Impossible de récupérer les données Roblox (data vide)",
-                raw: gameInfo
-            });
+        // Sécurité minimale : vérifier la structure
+        if (!body || typeof body.playing !== "number" || typeof body.teams !== "object") {
+            return res.status(400).json({ error: "Payload invalide" });
         }
 
-        const game = gameInfo.data[0];
+        liveStats = {
+            playing: body.playing,
+            teams: body.teams,
+            updatedAt: new Date().toISOString()
+        };
 
-        res.json({
-            name: game.name,
-            description: game.description,
-            playing: game.playing,
-            maxPlayers: game.maxPlayers,
-            visits: game.visits,
-            favorites: game.favoritedCount,
-            likes: game.likes,
-            dislikes: game.dislikes,
-            teams: teamsData
-        });
-
+        return res.json({ status: "ok" });
     } catch (err) {
-        console.error("Erreur /stats :", err);
-        res.status(500).json({ error: "Erreur interne API" });
+        console.error("Erreur /ingame-stats :", err);
+        return res.status(500).json({ error: "Erreur interne" });
     }
 });
 
-
-// ====== LANCEMENT SERVEUR ======
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log("API NantesRP Stats en ligne sur le port " + PORT);
+// Endpoint consommé par ton panel (GET)
+app.get("/stats", (req, res) => {
+    try {
+        // Tu peux enrichir ici avec d'autres infos (nom du jeu, etc. en dur)
+        return res.json({
+            name: "Nantes RP FR",
+            description: "Le jeu roblox Nantes RP officiel.",
+            playing: liveStats.playing,
+            teams: liveStats.teams,
+            updatedAt: liveStats.updatedAt
+        });
+    } catch (err) {
+        console.error("Erreur /stats :", err);
+        return res.status(500).json({ error: "Erreur interne" });
+    }
 });
 
+app.listen(PORT, () => {
+    console.log(`API NantesRP Stats en ligne sur le port ${PORT}`);
+});
