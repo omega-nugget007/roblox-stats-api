@@ -4,6 +4,9 @@ import cors from "cors";
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+app.get("/health", (req, res) => res.json({ status: "ok" }));
+
+
 app.use(express.json());
 app.use(cors());
 
